@@ -1,3 +1,95 @@
+const codeEl = document.getElementById('code');
+const lineNumbersEl = document.getElementById('lineNumbers');
+const tabsBar = document.getElementById('tabsBar');
+const newFileBtn = document.getElementById('newFileBtn');
+
+// Initialize Virtual File System (VFS)
+window.vfs = {
+    "main.psc": codeEl.value
+};
+window.currentFile = "main.psc";
+
+function renderTabs() {
+    tabsBar.innerHTML = '';
+    for (let fname in window.vfs) {
+        const tab = document.createElement('div');
+        tab.className = `tab ${fname === window.currentFile ? 'active' : ''}`;
+        
+        const title = document.createElement('span');
+        title.textContent = fname;
+        tab.appendChild(title);
+
+        if (fname !== 'main.psc') {
+            const closeBtn = document.createElement('span');
+            closeBtn.className = 'tab-close';
+            closeBtn.innerHTML = '&#10005;';
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Close ${fname}?`)) {
+                    delete window.vfs[fname];
+                    if (window.currentFile === fname) window.currentFile = "main.psc";
+                    renderTabs();
+                    loadCurrentFile();
+                }
+            };
+            tab.appendChild(closeBtn);
+        }
+
+        tab.onclick = () => {
+            window.currentFile = fname;
+            renderTabs();
+            loadCurrentFile();
+        };
+        tabsBar.appendChild(tab);
+    }
+}
+
+function loadCurrentFile() {
+    codeEl.value = window.vfs[window.currentFile] || '';
+    updateLineNumbers();
+}
+
+codeEl.addEventListener('input', (e) => {
+    window.vfs[window.currentFile] = e.target.value;
+    updateLineNumbers();
+});
+
+newFileBtn.addEventListener('click', () => {
+    const fname = prompt("Enter file name:", "File.txt");
+    if (fname && window.vfs[fname] === undefined) {
+        window.vfs[fname] = '';
+        window.currentFile = fname;
+        renderTabs();
+        loadCurrentFile();
+    } else if (fname && window.vfs[fname] !== undefined) {
+        alert("File already exists!");
+    }
+});
+
+// Listen for internal file writes from interpreter
+window.addEventListener('vfs-updated', (e) => {
+    if (e.detail === window.currentFile) {
+        const start = codeEl.selectionStart;
+        loadCurrentFile();
+        codeEl.selectionStart = start;
+        codeEl.selectionEnd = start;
+    }
+});
+
+function updateLineNumbers() {
+    const lines = codeEl.value.split('\n').length;
+    const numbersArray = Array.from({ length: lines }, (_, i) => i + 1);
+    lineNumbersEl.innerHTML = numbersArray.join('<br>');
+}
+
+codeEl.addEventListener('scroll', () => {
+    lineNumbersEl.scrollTop = codeEl.scrollTop;
+});
+
+// Initialization
+renderTabs();
+updateLineNumbers();
+
 (() => {
     const codeEl = document.getElementById('code');
     const runBtn = document.getElementById('run');
@@ -101,6 +193,34 @@
             tokens.push(cur);
         }
         return tokens;
+    }
+
+    function splitTopLevel(s, sep = ',') {
+        const parts = [];
+        let cur = '', depth = 0, inStr = false, quote = null;
+        for (let ch of s) {
+            if (inStr) {
+                cur += ch;
+                if (ch === quote) inStr = false;
+            } else if (ch === '"' || ch === "'") {
+                inStr = true;
+                quote = ch;
+                cur += ch;
+            } else if (['(', '[', '{'].includes(ch)) {
+                depth++;
+                cur += ch;
+            } else if ([')', ']', '}'].includes(ch)) {
+                depth--;
+                cur += ch;
+            } else if (ch === sep && depth === 0) {
+                parts.push(cur);
+                cur = '';
+            } else {
+                cur += ch;
+            }
+        }
+        if (cur !== '') parts.push(cur);
+        return parts;
     }
 
     // --- PARSER ---
@@ -479,6 +599,32 @@
                 return { type: 'return', expr };
             }
 
+            if (tok0 === 'OPENFILE') {
+                const fileName = tokens[1];
+                const mode = tokens[tokens.length - 1].toUpperCase();
+                i++;
+                return { type: 'openfile', fileName, mode };
+            }
+            
+            if (tok0 === 'WRITEFILE') {
+                const dataIdx = tokens[2] === ',' ? 3 : 2;
+                const data = tokens.slice(dataIdx).join(' ');
+                i++;
+                return { type: 'writefile', fileName: tokens[1], data };
+            }
+            
+            if (tok0 === 'READFILE') {
+                const varName = tokens[2] === ',' ? tokens[3] : tokens[2];
+                i++;
+                return { type: 'readfile', fileName: tokens[1], varName };
+            }
+            
+            if (tok0 === 'CLOSEFILE') {
+                const fileName = tokens[1];
+                i++;
+                return { type: 'closefile', fileName };
+            }
+
             const fallbackExpr = tokens.join(' ');
             i++;
             return { type: 'expr', expr: fallbackExpr };
@@ -567,6 +713,8 @@
         const vars = {};
         const constants = new Set();
         const functions = {};
+        // const vfs = {};
+        const fileHandles = {};
 
         const builtins = {
             STR: x => String(x),
@@ -589,8 +737,18 @@
                 const pow = Math.pow(10, Number(p));
                 return Math.round(Number(n) * pow) / pow;
             },
-            INT: x => Math.floor(x)
+            INT: x => Math.floor(x),
+            EOF: (fileName) => {
+                const handle = fileHandles[fileName];
+                if (!handle) throw new Error(`File ${fileName} is not open.`);
+                const content = window.vfs[fileName] || "";
+                return handle.pointer >= content.split('\n').length;
+            },
         };
+
+        function ensureNewline(str) {
+            return (str.length > 0 && !str.endsWith('\n')) ? str + '\n' : str;
+        }
 
         function isRefVal(v) {
             return v && typeof v === 'object' && v.__isRef === true;
@@ -661,14 +819,15 @@
 
         function transformExpression(expr) {
             if (!expr || expr.trim() === '') return 'undefined';
-
+        
             let res = '';
             let bracketDepth = 0;
             let parenDepth = 0;
-
+        
             for (let i = 0; i < expr.length; ) {
                 const ch = expr[i];
-
+        
+                // Handle Strings
                 if (ch === '"' || ch === "'") {
                     const quote = ch;
                     res += ch; i++;
@@ -678,18 +837,20 @@
                     if (i < expr.length) { res += expr[i]; i++; }
                     continue;
                 }
-
+        
+                // Handle Identifiers and Keywords
                 if (/[A-Za-z_]/.test(ch)) {
                     let j = i + 1;
                     while (j < expr.length && /[A-Za-z0-9_]/.test(expr[j])) j++;
                     const ident = expr.slice(i, j);
                     const upper = ident.toUpperCase();
-
+        
                     const keywords = {
                         'AND': '&&', 'OR': '||', 'NOT': '!', 
-                        'TRUE': 'true', 'FALSE': 'false', 'MOD': '%', 'DIV': '/'
+                        'TRUE': 'true', 'FALSE': 'false', 
+                        'MOD': '%', 'DIV': 'DIV' // Placeholder for post-processing
                     };
-
+        
                     if (keywords[upper]) {
                         res += keywords[upper];
                         i = j;
@@ -713,6 +874,7 @@
                     }
                 } 
                 else {
+                    // Handle Operators and Punctuation
                     const two = expr.slice(i, i + 2);
                     if (two === '<>') { res += '!=='; i += 2; }
                     else if (two === '<=') { res += '<='; i += 2; }
@@ -744,6 +906,13 @@
                     else { res += ch; i++; }
                 }
             }
+
+            while (res.includes('DIV')) {
+                const newRes = res.replace(/(\([^()]+\)|[a-zA-Z0-9_.]+)\s*DIV\s*(\([^()]+\)|[a-zA-Z0-9_.]+)/g, "Math.floor($1 / $2)");
+                if (newRes === res) break;
+                res = newRes;
+            }
+        
             return res;
         }
 
@@ -949,6 +1118,61 @@
                     await callUserFunction(name, argValues);
                     return null;
                 }
+                case 'openfile': {
+                    const fileName = await evalExpr(node.fileName, localBindings);
+                    const mode = node.mode.toUpperCase(); // READ, WRITE, APPEND
+                    
+                    // Requirement 1: Create file if it doesn't exist
+                    if (window.vfs[fileName] === undefined) {
+                        window.vfs[fileName] = "";
+                    }
+    
+                    if (mode === 'WRITE') {
+                        window.vfs[fileName] = ""; // Clear content for WRITE
+                    } 
+                    
+                    // Requirement 2: Fix Newline for APPEND
+                    if (mode === 'APPEND') {
+                        window.vfs[fileName] = ensureNewline(window.vfs[fileName]);
+                    }
+    
+                    fileHandles[fileName] = { mode: mode, pointer: 0 };
+                    
+                    return null;
+                }
+                case 'writefile': {
+                    const fileName = await evalExpr(node.fileName, localBindings);
+                    const data = await evalExpr(node.data, localBindings);
+                    const handle = fileHandles[fileName];
+    
+                    if (!handle || handle.mode === 'READ') {
+                        throw new Error(`File ${fileName} not open for writing.`);
+                    }
+    
+                    // Add content with a newline
+                    window.vfs[fileName] += data + '\n';
+                    return null;
+                }
+                case 'readfile': {
+                    const fileName = await evalExpr(node.fileName, localBindings);
+                    const handle = fileHandles[fileName];
+                    
+                    if (!handle || handle.mode !== 'READ') {
+                        throw new Error(`File ${fileName} not open for reading.`);
+                    }
+    
+                    const lines = window.vfs[fileName].split('\n');
+                    const lineContent = lines[handle.pointer] || "";
+                    
+                    await setLValue(node.varName, lineContent, localBindings);
+                    handle.pointer++;
+                    return null;
+                }
+                case 'closefile': {
+                    const fileName = await evalExpr(node.fileName, localBindings);
+                    delete fileHandles[fileName];
+                    return null;
+                }
             }
             return null;
         }
@@ -961,34 +1185,6 @@
                 }
             }
         };
-    }
-
-    function splitTopLevel(s, sep = ',') {
-        const parts = [];
-        let cur = '', depth = 0, inStr = false, quote = null;
-        for (let ch of s) {
-            if (inStr) {
-                cur += ch;
-                if (ch === quote) inStr = false;
-            } else if (ch === '"' || ch === "'") {
-                inStr = true;
-                quote = ch;
-                cur += ch;
-            } else if (['(', '[', '{'].includes(ch)) {
-                depth++;
-                cur += ch;
-            } else if ([')', ']', '}'].includes(ch)) {
-                depth--;
-                cur += ch;
-            } else if (ch === sep && depth === 0) {
-                parts.push(cur);
-                cur = '';
-            } else {
-                cur += ch;
-            }
-        }
-        if (cur !== '') parts.push(cur);
-        return parts;
     }
 
     function getConsoleInput() {
@@ -1009,28 +1205,34 @@
                 res(v);
             }
         }
+        renderTabs();
     });
 
     runBtn.addEventListener('click', async () => {
+        if (!window.currentFile.endsWith(".psc")) return;
         consoleEl.textContent = '';
         debugOut.textContent = 'Executing...';
         try {
-            const parsed = parse(codeEl.value);
+            const sourceCode = window.vfs ? window.vfs[window.currentFile] : codeEl.value;
+            const parsed = parse(sourceCode);
             const ex = createExecutor();
             await ex.execProgram(parsed.program);
             debugOut.textContent = 'Finished.';
         } catch (e) {
             appendConsole('Error: ' + e.message);
         }
+        renderTabs();
     });
 
     showAstBtn.addEventListener('click', () => {
         try {
-            const parsed = parse(codeEl.value);
+            const sourceCode = window.vfs ? window.vfs[window.currentFile] : codeEl.value;
+            const parsed = parse(sourceCode);
             debugOut.textContent = JSON.stringify(parsed, null, 4);
         } catch (e) {
             debugOut.textContent = e.message;
         }
+        renderTabs();
     });
 
     clearConsoleBtn.addEventListener('click', () => {
