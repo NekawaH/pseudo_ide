@@ -10,9 +10,17 @@
     <h1>Pseudocode IDE</h1>
 
     <div class="panel">
-        <div style="flex: 1">
+        <div style="flex: 1; display: flex; flex-direction: column;">
             <label class="small">Pseudocode</label>
-            <textarea id="code">DECLARE Values : ARRAY[1:100] OF INTEGER
+            
+            <div class="tabs-container">
+                <div id="tabsBar" class="tabs"></div>
+                <button id="newFileBtn" class="new-tab-btn">+</button>
+            </div>
+
+            <div class="editor-container">
+                <div id="lineNumbers">1</div>
+                <textarea id="code" wrap="off">DECLARE Values : ARRAY[1:100] OF INTEGER
 
 PROCEDURE SwapValue(BYREF X : REAL, Y : REAL)
     Temp <- X
@@ -51,6 +59,7 @@ CALL QuickSort(1, N)
 FOR Index <- 1 TO N
     OUTPUT Values[Index]
 NEXT Index</textarea>
+            </div>
 
             <div class="controls">
                 <button id="run">Execute</button>
@@ -66,7 +75,7 @@ NEXT Index</textarea>
         </div>
 
         <div class="sidebar">
-            <label class="small">Console / I/O</label>
+            <label class="small">Console</label>
             <div id="console" tabindex="0"></div>
 
             <div class="row" style="margin-top: 10px">
@@ -81,7 +90,7 @@ NEXT Index</textarea>
             <a href="https://github.com/NekawaH" target="_blank">
                 NekawaH
             </a>
-            <a href="https://github.com/NekawaH/Pseudorunner" target="_blank">
+            <a href="https://github.com/NekawaH/pseudo_ide" target="_blank">
                 <ion-icon name="logo-github"></ion-icon>
             </a>
         </div>
