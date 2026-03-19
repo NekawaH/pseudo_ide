@@ -27,7 +27,19 @@ textarea {
 }
 
 #code {
-    height: 320px;
+    flex: 1;
+    height: 100%;
+    border: none;
+    margin: 0;
+    padding: 8px;
+    resize: none;
+    outline: none;
+    white-space: pre;
+    overflow: auto;
+    box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 #console {
@@ -98,4 +110,88 @@ label.small {
     position: absolute;
     bottom: 0;
     width: 100%;
+}
+
+.editor-container {
+    display: flex;
+    height: 320px;
+    border: 1px solid #777;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+}
+
+#lineNumbers {
+    background: #f0f0f0;
+    color: #888;
+    padding: 8px 6px;
+    text-align: right;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    user-select: none;
+    overflow: hidden;
+    min-width: 35px;
+    box-sizing: border-box;
+}
+
+.tabs-container {
+    display: flex;
+    border: 1px solid #777;
+    border-bottom: 1px solid #ccc;
+    background: #e8e8e8;
+    border-radius: 4px 4px 0 0;
+    padding-top: 6px;
+    padding-left: 6px;
+}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex: 1;
+}
+
+.tab {
+    padding: 6px 12px;
+    background: #d4d4d4;
+    border: 1px solid #aaa;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.tab.active {
+    background: #fff;
+    border-color: #ccc;
+    font-weight: bold;
+    margin-bottom: -1px;
+    padding-bottom: 7px;
+}
+
+.tab-close {
+    cursor: pointer;
+    color: #888;
+    font-size: 12px;
+}
+
+.tab-close:hover {
+    color: #d00;
+}
+
+.new-tab-btn {
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 12px;
+    color: #444;
+}
+
+.new-tab-btn:hover {
+    color: #000;
 }
