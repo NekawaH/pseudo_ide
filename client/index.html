@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pseudocode IDE</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Pseudocode IDE</h1>
+
+    <div class="panel">
+        <div style="flex: 1; display: flex; flex-direction: column;">
+            <label class="small">Pseudocode</label>
+            
+            <div class="tabs-container">
+                <div id="tabsBar" class="tabs"></div>
+                <button id="newFileBtn" class="new-tab-btn">+</button>
+            </div>
+
+            <div class="editor-container">
+                <div id="lineNumbers">1</div>
+                <textarea id="code" wrap="off">DECLARE Values : ARRAY[1:100] OF INTEGER
+
+PROCEDURE SwapValue(BYREF X : REAL, Y : REAL)
+    Temp <- X
+    X <- Y
+    Y <- Temp
+ENDPROCEDURE
+
+PROCEDURE QuickSort(Left:INTEGER, Right:INTEGER)
+    IF Left < Right THEN
+        PivotPos <- Partition(Left, Right)
+        CALL QuickSort(Left, PivotPos - 1)
+        CALL QuickSort(PivotPos + 1, Right)
+    ENDIF
+ENDPROCEDURE
+
+FUNCTION Partition(Left:INTEGER, Right:INTEGER) RETURNS INTEGER
+    Pivot <- Values[Right]
+    i <- Left - 1
+    FOR j <- Left TO Right - 1
+        IF Values[j] <= Pivot THEN
+            i <- i + 1
+            CALL SwapValue(Values[i], Values[j])
+        ENDIF
+    NEXT j
+    CALL SwapValue(Values[i + 1], Values[Right])
+    RETURN i + 1
+ENDFUNCTION
+
+INPUT N
+FOR Index <- 1 TO N
+    INPUT Values[Index]
+NEXT Index
+
+CALL QuickSort(1, N)
+
+FOR Index <- 1 TO N
+    OUTPUT Values[Index]
+NEXT Index</textarea>
+            </div>
+
+            <div class="controls">
+                <button id="run">Execute</button>
+                <button id="showAst">Show AST</button>
+                <button id="clearConsole">Clear Console</button>
+                <button id="saveCloudBtn" style="background-color: #28a745; color: white;">Save to Cloud</button>
+                <label class="small" style="margin-left: 10px;">
+                    <input type="checkbox" id="showPrompts" checked> Show Input Prompts
+                </label>
+            </div>
+
+            <label class="small">Debug</label>
+            <pre id="debugOut"></pre>
+        </div>
+
+        <div class="sidebar">
+            <label class="small">Console</label>
+            <div id="console" tabindex="0"></div>
+
+            <div class="row" style="margin-top: 10px">
+                <input id="consoleInput" placeholder="Type input here and press Enter" style="flex: 1" type="text" />
+            </div>
+
+            <div class="note">When the running program requests <code>INPUT &lt;var&gt;</code>, type value and press Enter.</div>
+        </div>
+
+        <div class="copyright">
+            &copy; 2026 
+            <a href="https://github.com/NekawaH" target="_blank">
+                NekawaH
+            </a>
+            <a href="https://github.com/NekawaH/pseudo_ide" target="_blank">
+                <ion-icon name="logo-github"></ion-icon>
+            </a>
+        </div>
+    </div>
+
+    <script src="interpreter.js"></script>
+    <script src="indentation.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+</html>
