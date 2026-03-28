@@ -5,15 +5,6 @@ const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const path = require('path');
-
-// This tells Express to serve all files in your project folder (html, js, css)
-app.use(express.static(path.join(__dirname))); 
-
-// This ensures that visiting the root URL sends your index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
 
 // Middleware
 app.use(cors());
