@@ -10,7 +10,7 @@ window.vfs = {
 window.currentFile = "main.psc";
 
 const GUEST_ID = "guest-123";
-const API_URL = "http://localhost:3000/api";
+const API_URL = window.location.origin + "/api";
 
 // 1. Initial Load from Cloud
 async function initCloudProject() {
